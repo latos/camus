@@ -70,18 +70,18 @@ func (c *ClientImpl) Push(server string) (string, error) {
 	remoteLatestDir := path.Join(remoteDeployDir, "../../_latest")
 	sshTarget := c.app.SshTarget(server)
 
-	// TODO(koz): Delete this code when I fix ssh on my computer.
-	/*
-		if true {
-			err := runVisibleCmd("rsync", "-azv", "--delete",
-				localDeployDir+"/",
-				remoteDeployDir)
-			if err != nil {
-				return "", err
-			}
-			return reply.DeployId, nil
-		}
-	*/
+	// Uncomment the code below if you don't have sshd running on your
+	// Dev box
+	//if true {
+	//	err := runVisibleCmd("rsync", "-azv", "--delete",
+	//		localDeployDir+"/",
+	//		remoteDeployDir)
+	//	if err != nil {
+	//		return "", err
+	//	}
+	//	return reply.DeployId, nil
+	//}
+
 	if err := runVisibleCmd("rsync", "-azv", "--delete",
 		localDeployDir+"/",
 		sshTarget+":"+remoteLatestDir); err != nil {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"net"
 	"net/http"
 	"os"
@@ -369,7 +370,34 @@ func (s *ServerImpl) writeConfig() error {
 }
 
 func (s *ServerImpl) SetMainByPort(port int) error {
+	err := s.setCurrentSymlink(port)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("HERE 7\n")
 	return s.reloadHaproxy(port)
+}
+
+func (s *ServerImpl) setCurrentSymlink(port int) error {
+	fmt.Printf("HERE 1\n")
+	deployId, ok := s.config.Ports[strconv.Itoa(port)]
+	fmt.Printf("HERE 2\n")
+	if !ok {
+		return fmt.Errorf("No deploy running on port %d", port)
+	}
+	fmt.Printf("HERE 3\n")
+
+	currentSymlinkPath := path.Join(s.root, strconv.Itoa(rand.Intn(1000)))
+	fmt.Printf("HERE 4: %s\n", currentSymlinkPath)
+	err := os.Symlink(s.deployDir(deployId), currentSymlinkPath)
+	fmt.Printf("HERE 5\n")
+	if err != nil {
+		return err
+	}
+	fmt.Printf("HERE 6: %s\n", path.Join(s.root, "current"))
+
+	return os.Rename(currentSymlinkPath, path.Join(s.root, "current"))
 }
 
 func (s *ServerImpl) Run(deployIdToRun string) (int, error) {
