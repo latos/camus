@@ -15,7 +15,8 @@ type Client interface {
 	Run(deployId string) (int, error)
 	SetMainByPort(port int) error
 	ListDeploys() ([]*Deploy, error)
-	KillUnknownProcesses() []int
+	KillUnknownProcesses()
+	Shutdown()
 }
 
 type ClientImpl struct {
@@ -148,9 +149,14 @@ func prepend(item interface{}, items []interface{}) []interface{} {
 	return append([]interface{}{item}, items...)
 }
 
-func (c *ClientImpl) KillUnknownProcesses() []int {
+func (c *ClientImpl) KillUnknownProcesses() {
 	var args KillUnknownProcessesRequest
 	var reply KillUnknownProcessesResponse
 	c.client.Call("RpcServer.KillUnknownProcesses", &args, &reply)
-	return reply.KilledPids
+}
+
+func (c *ClientImpl) Shutdown() {
+	var args ShutdownRequest
+	var reply ShutdownResponse
+	c.client.Call("RpcServer.Shutdown", &args, &reply)
 }
