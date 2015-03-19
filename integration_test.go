@@ -199,7 +199,7 @@ func TestHaproxy(t *testing.T) {
 
 	writeDataIntoTestapp(t, "version 1")
 	client.Build()
-	v1DeployId := client.Push("prod")
+	v1DeployId := client.Push()
 
 	// XXX(koz): Hilariously, as we choose ids based on the current timestamp
 	// to the second, pushing twice in quick succession here breaks as we
@@ -210,7 +210,7 @@ func TestHaproxy(t *testing.T) {
 
 	writeDataIntoTestapp(t, "version 2")
 	client.Build()
-	v2DeployId := client.Push("prod")
+	v2DeployId := client.Push()
 
 	port1 := client.Run(v1DeployId)
 	port2 := client.Run(v2DeployId)
@@ -226,4 +226,85 @@ func TestHaproxy(t *testing.T) {
 	expectGet(t, haproxyPort, "/file", "version 1")
 	client.SetMainByPort(port2)
 	expectGet(t, haproxyPort, "/file", "version 2")
+}
+
+// TestTracked tests that the Tracked field is only true when a deploy is
+// configured to run.
+func TestTracked(t *testing.T) {
+	client, server := startCamus(t)
+	defer server.Kill()
+	defer client.Shutdown()
+
+	client.Build()
+	deployId := client.Push()
+	deploys := client.ListDeploys()
+	if len(deploys) != 1 {
+		t.Fatalf("expected exactly 1 deploy, got %d", len(deploys))
+	}
+	if deploys[0].Tracked {
+		t.Fatalf("expected the deploy not to be tracked, but it was")
+	}
+
+	client.Run(deployId)
+	deploys = client.ListDeploys()
+	if len(deploys) != 1 {
+		t.Fatalf("expected exactly 1 deploy, got %d", len(deploys))
+	}
+	if !deploys[0].Tracked {
+		t.Fatalf("expected the deploy to be tracked, but it wasn't")
+	}
+
+	proc, err := os.FindProcess(deploys[0].Pid)
+	if err != nil {
+		t.Fatalf("failed to find the server process")
+	}
+
+	proc.Kill()
+
+	deploys = client.ListDeploys()
+	if len(deploys) != 1 {
+		t.Fatalf("expected exactly 1 deploy, got %d", len(deploys))
+	}
+	if !deploys[0].Tracked {
+		t.Fatalf("expected the deploy to be tracked, but it wasn't")
+	}
+}
+
+// TestPort tests that if a deploy is configured to run on a certain port, but
+// isn't for whatever reason, the port still shows up in camus list.
+func TestPort(t *testing.T) {
+	client, server := startCamus(t)
+	defer server.Kill()
+	defer client.Shutdown()
+
+	client.Build()
+	deployId := client.Push()
+	port := client.Run(deployId)
+	deploys := client.ListDeploys()
+	if len(deploys) != 1 {
+		t.Fatalf("expected exactly 1 deploy, got %d", len(deploys))
+	}
+	if deploys[0].Port != port {
+		t.Fatalf("expected port to be %d, but is %d", port, deploys[0].Port)
+	}
+	if deploys[0].Health != 200 {
+		t.Fatalf("expected health to be %d, but is %d", 200, deploys[0].Health)
+	}
+
+	proc, err := os.FindProcess(deploys[0].Pid)
+	if err != nil {
+		t.Fatalf("failed to find the server process")
+	}
+	proc.Kill()
+
+	deploys = client.ListDeploys()
+	if len(deploys) != 1 {
+		t.Fatalf("expected exactly 1 deploy, got %d", len(deploys))
+	}
+	if deploys[0].Port != port {
+		t.Fatalf("expected port to be %d, but is %d", port, deploys[0].Port)
+	}
+	if deploys[0].Health != 0 {
+		t.Fatalf("expected health to be 0, but is %d", deploys[0].Health)
+	}
 }
