@@ -451,7 +451,7 @@ func (s *ServerImpl) reloadHaproxy(port int) error {
 
 	cmd := haproxyCmd(cfgFile, pidFile, runningPid)
 
-	return cmd.Start()
+	return cmd.Run()
 }
 
 func haproxyCmd(cfgFile string, pidFile string, runningPid int) *exec.Cmd {
