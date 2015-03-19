@@ -7,11 +7,13 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 )
 
 type Client interface {
 	Build() (string, error)
 	Push(server string) (string, error)
+	// Run runs the specified deploy, returning the port it is listening on.
 	Run(deployId string) (int, error)
 	SetMainByPort(port int) error
 	ListDeploys() ([]*Deploy, error)
@@ -22,10 +24,11 @@ type Client interface {
 type ClientImpl struct {
 	app    Application
 	client *rpc.Client
+	dir    string
 }
 
-func NewClientImpl() (*ClientImpl, error) {
-	app, err := ApplicationFromConfig("deploy.json")
+func NewClientImpl(dir string) (*ClientImpl, error) {
+	app, err := ApplicationFromConfig(filepath.Join(dir, "deploy.json"))
 	if err != nil {
 		panic("Failed to read deploy.json, are sure you're in an app directory?")
 	}
@@ -41,11 +44,13 @@ func NewClientImpl() (*ClientImpl, error) {
 	return &ClientImpl{
 		app:    app,
 		client: client,
+		dir:    dir,
 	}, nil
 }
 
 func (c *ClientImpl) Build() (string, error) {
 	cmd := exec.Command("sh", "-c", c.app.BuildCmd())
+	cmd.Dir = c.dir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
@@ -75,7 +80,7 @@ func (c *ClientImpl) Push(server string) (string, error) {
 	// TODO(koz): Delete this code when I fix ssh on my computer.
 	/*
 		if true {
-			err := runVisibleCmd("rsync", "-azv", "--delete",
+			err := c.runVisibleCmd("rsync", "-azv", "--delete",
 				localDeployDir+"/",
 				remoteDeployDir)
 			if err != nil {
@@ -84,13 +89,13 @@ func (c *ClientImpl) Push(server string) (string, error) {
 			return reply.DeployId, nil
 		}
 	*/
-	if err := runVisibleCmd("rsync", "-azv", "--delete",
+	if err := c.runVisibleCmd("rsync", "-azv", "--delete",
 		localDeployDir+"/",
 		sshTarget+":"+remoteLatestDir); err != nil {
 		return "", err
 	}
 
-	if err := runVisibleCmd("ssh", sshTarget,
+	if err := c.runVisibleCmd("ssh", sshTarget,
 		"rsync", "-a", "--delete",
 		remoteLatestDir+"/", remoteDeployDir); err != nil {
 		return "", err
@@ -101,10 +106,11 @@ func (c *ClientImpl) Push(server string) (string, error) {
 	return reply.DeployId, nil
 }
 
-func runVisibleCmd(command string, args ...string) error {
+func (c *ClientImpl) runVisibleCmd(command string, args ...string) error {
 	cmd := exec.Command(command, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	cmd.Dir = c.dir
 	fmt.Printf("exec %s\n", cmd.Args)
 	return cmd.Run()
 }

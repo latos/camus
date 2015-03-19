@@ -48,7 +48,7 @@ func serverMain() {
 }
 
 func clientMain() {
-	client, err := NewClientImpl()
+	client, err := NewClientImpl(".")
 	if err != nil {
 		log.Fatal("NewClient:", err)
 	}
